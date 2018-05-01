@@ -104,13 +104,18 @@ def get_website(company):
             return(list(data_array[i].values())[0]['Website'])
 
 def find_links(org_url):
-    url="https://"+org_url
-    try:
-        resp=requests.get(url)
-    except Exception as e:
-        print(e)
-        url="http://"+org_url
-        resp=requests.get(url)
+    if(not org_url.startswith("http")):
+        url="https://"+org_url
+        print("line 109")
+        print(url)
+        try:
+            resp=requests.get(url)
+        except Exception as e:
+            print(e)
+            url="http://"+org_url
+            resp=requests.get(url)
+    else:
+        resp=requests.get(org_url)
     tags=['a','li','ul','ol','div','span']
     soup=BeautifulSoup(resp.text)
     #print(tags)
@@ -120,6 +125,7 @@ def find_links(org_url):
         menutags=soup.find_all(tag,class_=re.compile('.*menu.*'))
         for i in range(0,len(menutags)):
             linktags+=menutags[i].select("[href]")
+            #print(linktags)
     return(linktags)
 
 def fetch_and_write():
@@ -141,8 +147,10 @@ def read_from_datasource():
 
 def crawl_sub_pages(links):
     links=set(links)
+    hrefs=[]
     for link in links:
-        print(link.attrs['href'])
+        hrefs.append(link.attrs['href'])
+    return hrefs
 
 #fetch_and_write()
 read_from_datasource()
@@ -157,7 +165,10 @@ try:
             print(org_url)
             if(org_url!='NA'):
                 links=find_links(org_url)
-                links_array.append({company_name:links})
+                comp_link_array=crawl_sub_pages(links)
+                print(comp_link_array)
+                links_array.append({company.strip():comp_link_array})
+                #print(links_array)
         except:
             pass
     linksfile=open("links_file.json","w",encoding="utf-8")
