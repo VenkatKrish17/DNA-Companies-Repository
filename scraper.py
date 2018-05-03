@@ -47,7 +47,7 @@ def primary_info(company_name):
                 website=soup.select('span[id="External_links"]')[0].parent.select('+ ul')[0].findChildren()[0].select('a')[0].attrs['href']
                 if(website!=None and len(website)>0):
                     info_dict['Website']=website
-                    print(soup.select('span[id="External_links"]')[0].parent.select('+ ul')[0].findChildren()[0].select('a')[0].attrs['href'])
+                    #print(soup.select('span[id="External_links"]')[0].parent.select('+ ul')[0].findChildren()[0].select('a')[0].attrs['href'])
                 else:
                     info_dict['Website']='NA'
             else:
@@ -78,7 +78,7 @@ def get_website(company):
 def find_links(org_url):
     if(not org_url.startswith("http")):
         url="https://"+org_url
-        print("line 109")
+        #print("line 109")
         print(url)
         try:
             resp=requests.get(url)
@@ -94,18 +94,20 @@ def find_links(org_url):
     menutags=[]
     linktags=[]
     for tag in tags:
-        menutags=soup.find_all(tag,class_=re.compile('.*menu.*'))
+        menutags=soup.find_all(tag)
         for i in range(0,len(menutags)):
             linktags+=menutags[i].select("[href]")
             #print(linktags)
-    navtags=soup.find_all('nav')
-    for i in range(0,len(navtags)):
-        linktags+=navtags[i].select("[href]")
-    if(len(linktags)==0):
-        print("finding addtional links")
-        localtags=soup.find_all('a')
-        for i in range(0,len(localtags)):
-            linktags+=navtags[i].select("[href]")
+    # navtags=soup.find_all('nav')
+    # for i in range(0,len(navtags)):
+    #     linktags+=navtags[i].select("[href]")
+    # if(len(linktags)==0):
+    #     print("finding addtional links")
+    #     localtags=soup.find_all('a')
+    #     for i in range(0,len(localtags)):
+    #         linktags+=navtags[i].select("[href]")
+    print(org_url)
+    #print(len(linktags))
     return(linktags)
 
 def find_and_write_links():
@@ -119,6 +121,7 @@ def find_and_write_links():
                 if(org_url!='NA'):
                     links=find_links(org_url)
                     comp_link_array=get_navigatable_links(links)
+                    print(comp_link_array)
                     #print(comp_link_array)
                     links_array.append({company.strip():comp_link_array})
                     #print(links_array)
@@ -157,22 +160,55 @@ def get_navigatable_links(links):
     return list(set(hrefs))
 
 def categorise_links(sub_links):
-    categorized_links={"about":[],"contact":[]}
-    for sub_link in sub_links:
-        if("about" in str(sub_link) or "profile" in str(sub_link)):
-            categorized_links['about'].append(sub_link)
-        elif("contact" in str(sub_link) or
-        "reach" in str(sub_link) or
-        "support" in str(sub_link) or
-        "enquire" in str(sub_link) or
-        "customer-service" in str(sub_link) or
-        "support" in str(sub_link) or
-        "help" in str(sub_link)):
-            categorized_links['contact'].append(sub_link)
-        else:
-            pass
+    #print(sub_links)
+    try:
+        categorized_links={"about":[],"contact":[],"news":[],"blog":[],"investor":[],"others":[]}
+        #print(len(sub_links))
+        for sub_link in sub_links:
+            #print(sub_link)
+            if("about" in str(sub_link) or "profile" in str(sub_link)):
+                #print("found about")
+                categorized_links['about'].append(sub_link)
+            elif("contact" in str(sub_link) or
+            "reach" in str(sub_link) or
+            "support" in str(sub_link) or
+            "enquire" in str(sub_link) or
+            "customer-service" in str(sub_link) or
+            "support" in str(sub_link) or
+            "help" in str(sub_link)):
+                categorized_links['contact'].append(sub_link)
+            elif("news" in str(sub_link) or "press" in str(sub_link) or "media" in str(sub_link)):
+                categorized_links['news'].append(sub_link)
+            elif("investor" in str(sub_link) or "partner" in str(sub_link) ):
+                categorized_links['investor'].append(sub_link)
+            elif("blog" in str(sub_link) or "story" in str(sub_link)):
+                categorized_links['blog'].append(sub_link)
+            else:
+                categorized_links['blog'].append(sub_link)
+    except Exception as e:
+        print(e)
+
+
+
     return(categorized_links)
 
+def get_full_sub_url(company_name,i):
+    url=""
+    if(not i.startswith('http')):
+        company_url=get_website(company_name)
+        if(i.startswith("/") and not company_url.endswith("/")):
+            url=company_url+i
+        elif(i.startswith("/") and company_url.endswith("/")):
+            url=company_url+i[1:]
+        elif(company_url.endswith("/")):
+            url=get_website(company_name)+i
+        else:
+            url=get_website(company_name)+"/"+i
+
+    else:
+        url=i
+    print("formed"+url)
+    return url
 
 comp_contact_dict={}
 def crawl_sub_pages(company_name):
@@ -180,72 +216,71 @@ def crawl_sub_pages(company_name):
         links_file=open('links_file.json',encoding='utf-8')
         links_array=json.load(links_file)
         global comp_contact_dict
+        comp_contact_dict[company_name]=[]
         for i in links_array:
-            #print(list(i.keys())[0])
             if(list(i.keys())[0]==company_name):
-                #print()
                 sub_links=list(i.values())[0];
                 categorized=categorise_links(sub_links)
-            #fetching contacts
+                company_url=get_website(company_name)
                 #print(categorized)
-                comp_contact_dict[company_name]=[]
-                for i in categorized['contact']:
-                    url=""
-                    if(not i.startswith('http')):
-                        url=get_website(company_name)+"/"+i
-                    else:
-                        url=i
-                    resp=requests.get(url)
-                    #print(str(resp.text))
-                    #print(re.findall('^[+\d]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){1,10}',str(resp.text))[0])
-                    num_set=set()
-                    contacts=re.findall('([+\(]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){7,10})',str(resp.text))
-                    if(len(contacts)>0):
-                        print(len(contacts))
-                        for number in contacts:
-                            num_set.add(number[0])
-                        comp_contact_dict[company_name]=set(comp_contact_dict[company_name] + list(num_set))
-                    else:
-                        print("searching in about")
-                        for in_i in categorized['about']:
-                            url=""
-                            if(not in_i.startswith('http')):
-                                url=get_website(company_name)+"/"+in_i
-                            else:
-                                url=in_i
-                            resp=requests.get(url)
-                            #print(str(resp.text))
-                            #print(re.findall('^[+\d]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){1,10}',str(resp.text))[0])
-                            num_set=set()
-                            abt_contacts=re.findall('([+\(]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){7,10})',str(resp.text))
-                            if(len(contacts)>0):
-                                for number in abt_contacts:
-                                    num_set.add(number[0])
-                                comp_contact_dict[company_name]=set(comp_contact_dict[company_name] + list(num_set))
+                #print(company_url)
+                print(company_name)
+                for i in categorized.keys():
+                    print(i+str(len(categorized[i])))
+                if(len(categorized['contact'])>0):
+                    for i in categorized['contact']:
+                        url=get_full_sub_url(company_name,i)
+                        resp=requests.get(url)
+                        num_set=[]
+                        contacts=re.findall('([+\(]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){7,10})',str(resp.text))
+                        if(len(contacts)>0):
+                            for number in contacts:
+                                num_set.append(number[0])
+                            #print(num_set)
+                            comp_contact_dict[company_name]=comp_contact_dict[company_name] + num_set
+                elif(len(categorized['about'])>0):
+                    for in_i in categorized['about']:
+                        url=get_full_sub_url(company_name,i)
+                        resp=requests.get(url)
+                        num_set=[]
+                        abt_contacts=re.findall('([+\(]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){7,10})',str(resp.text))
+                        if(len(abt_contacts)>0):
+                            for number in abt_contacts:
+                                num_set.append(number[0])
+                            comp_contact_dict[company_name]=comp_contact_dict[company_name] + num_set
+                else:
+                    resp=requests.get(company_url)
+                    num_set=[]
+                    home_contacts=re.findall('([+\(]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){7,10})',str(resp.text))
+                    if(len(home_contacts)>0):
+                        for number in home_contacts:
+                            num_set.append(number[0])
+                        comp_contact_dict[company_name]=comp_contact_dict[company_name] + num_set
 
-
-                    print(comp_contact_dict)
 
                     #print(re.findall('([+\(\d]+([\s\-\(\{\[]*[\d]+[\)\]\}]*){7,10})',"(65) 6786 2866")[1
 
             else:
                 pass
+        #print(comp_contact_dict)
             #print("No link found :(  ")
-    except:
-        pass
+    except Exception as e:
+        print(e)
+
 
 #fetch all wiki info and official website
 #fetch_and_write()
 #read from the data source and store in a global variable
 read_from_datasource()
 #find all navigable links
-find_and_write_links()
+#find_and_write_links()
 #crawl_sub_pages('Near')
 #crawl_sub_pages('ABR Holdings Ltd')
 #crawl_sub_pages('FilmTack')
 f=open("sourcedata.txt")
 for line in f:
     #print(line)
+    print(line)
     crawl_sub_pages(line.strip())
 #crawl_sub_pages('Venture Corporation')
 # company='Far East Orchard'
